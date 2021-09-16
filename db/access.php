@@ -24,7 +24,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
-
+// 权限
 $capabilities = [
     'auth/cnoauth:manageconnection' => [
         'riskbitmask' => RISK_CONFIG,

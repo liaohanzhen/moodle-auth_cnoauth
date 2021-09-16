@@ -21,6 +21,7 @@
  * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
  */
 
+//  用户删除后的处理
 $observers = [
     [
         'eventname' => '\core\event\user_deleted',

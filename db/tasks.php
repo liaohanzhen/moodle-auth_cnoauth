@@ -24,7 +24,7 @@
  */
 
 defined('MOODLE_INTERNAL') || die();
-
+// 清理state和token表
 $tasks = [
     [
         'classname' => 'auth_cnoauth\task\cleanup_cnoauth_state_and_token',

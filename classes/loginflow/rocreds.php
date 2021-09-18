@@ -18,7 +18,7 @@
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth\loginflow;
@@ -33,7 +33,7 @@ require_once($CFG->dirroot . '/auth/cnoauth/lib.php');
 class rocreds extends base {
     /**
      * Check for an existing user object.
-     *
+     * 检查是否存在365用户
      * @param string $o356username
      *
      * @return string If there is an existing user object, return the username associated with it.
@@ -43,14 +43,14 @@ class rocreds extends base {
         global $DB;
 
         $user = null;
-        if (auth_cnoauth_is_local_365_installed()) {
-            $sql = 'SELECT u.username
-                      FROM {local_o365_objects} obj
-                      JOIN {user} u ON u.id = obj.moodleid
-                     WHERE obj.o365name = ? and obj.type = ?';
-            $params = [$o356username, 'user'];
-            $user = $DB->get_record_sql($sql, $params);
-        }
+        // if (auth_cnoauth_is_local_365_installed()) {
+        //     $sql = 'SELECT u.username
+        //               FROM {local_o365_objects} obj
+        //               JOIN {user} u ON u.id = obj.moodleid
+        //              WHERE obj.o365name = ? and obj.type = ?';
+        //     $params = [$o356username, 'user'];
+        //     $user = $DB->get_record_sql($sql, $params);
+        // }
 
         return (!empty($user)) ? $user->username : $o356username;
     }
@@ -134,7 +134,7 @@ class rocreds extends base {
 
     /**
      * This is the primary method that is used by the authenticate_user_login() function in moodlelib.php.
-     *
+     * 用户登录
      * @param string $username The username (with system magic quotes)
      * @param string $password The password (with system magic quotes)
      * @return bool Authentication success or failure.
@@ -157,30 +157,13 @@ class rocreds extends base {
         // Make request.
         $tokenparams = $client->rocredsrequest($cnoauthusername, $password);
         if (!empty($tokenparams) && isset($tokenparams['token_type']) && $tokenparams['token_type'] === 'Bearer') {
-            list($cnoauthuniqid, $idtoken) = $this->process_idtoken($tokenparams['id_token']);
-
-            // Check restrictions.
-            $passed = $this->checkrestrictions($idtoken);
-            if ($passed !== true) {
-                $errstr = 'User prevented from logging in due to restrictions.';
-                \auth_cnoauth\utils::debug($errstr, 'handleauthresponse', $idtoken);
-                return false;
-            }
+            list($cnoauthuniqid, $userinfo) = $this->process_userinfo($tokenparams['userinfo']);
 
             $tokenrec = $DB->get_record('auth_cnoauth_token', ['cnoauthuniqid' => $cnoauthuniqid]);
             if (!empty($tokenrec)) {
                 $this->updatetoken($tokenrec->id, $authparams, $tokenparams);
             } else {
-                $originalupn = null;
-                if (\auth_cnoauth_is_local_365_installed()) {
-                    $apiclient = \local_o365\utils::get_api();
-                    $userdetails = $apiclient->get_user($cnoauthuniqid, true);
-                    if (!is_null($userdetails) && isset($userdetails['userPrincipalName']) &&
-                        stripos($userdetails['userPrincipalName'], '#EXT#') !== false) {
-                        $originalupn = $userdetails['userPrincipalName'];
-                    }
-                }
-                $this->createtoken($cnoauthuniqid, $username, $authparams, $tokenparams, $idtoken, 0, $originalupn);
+                $this->createtoken($cnoauthuniqid, $authparams, $tokenparams, 0);
             }
             return true;
         }

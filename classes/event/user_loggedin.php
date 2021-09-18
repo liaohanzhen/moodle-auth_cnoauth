@@ -18,7 +18,7 @@
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth\event;
@@ -42,7 +42,7 @@ class user_loggedin extends \core\event\base {
      * @return string
      */
     public function get_description() {
-        return "The user with id '$this->userid' has logged in using OpenID Connect (auth plugin 'auth_cnoauth').";
+        return "The user with id '$this->userid' has logged in using CN OpenID Connect (auth plugin 'auth_cnoauth').";
     }
 
     /**

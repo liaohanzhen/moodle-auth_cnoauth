@@ -18,7 +18,7 @@
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth\event;
@@ -42,7 +42,7 @@ class user_authed extends \core\event\base {
      * @return string
      */
     public function get_description() {
-        return "A user authorized with OpenID Connect, but did not associate with a user account.";
+        return "A user authorized with CN OpenID Connect, but did not associate with a user account.";
     }
 
     /**

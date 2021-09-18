@@ -19,9 +19,9 @@
  *
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
- * @author Lai Wei <lai.wei@enovation.ie>
+ * 
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -48,22 +48,22 @@ $settings->add(new admin_setting_configtext('auth_cnoauth/clientsecret', $config
 
 $configkey = new lang_string('cfg_authendpoint_key', 'auth_cnoauth');
 $configdesc = new lang_string('cfg_authendpoint_desc', 'auth_cnoauth');
-$configdefault = 'https://login.microsoftonline.com/common/oauth2/authorize';
+$configdefault = 'https://open.weixin.qq.com/connect/oauth2/authorize';
 $settings->add(new admin_setting_configtext('auth_cnoauth/authendpoint', $configkey, $configdesc, $configdefault, PARAM_TEXT));
 
 $configkey = new lang_string('cfg_tokenendpoint_key', 'auth_cnoauth');
 $configdesc = new lang_string('cfg_tokenendpoint_desc', 'auth_cnoauth');
-$configdefault = 'https://login.microsoftonline.com/common/oauth2/token';
+$configdefault = 'https://api.weixin.qq.com/sns/oauth2/access_token';
 $settings->add(new admin_setting_configtext('auth_cnoauth/tokenendpoint', $configkey, $configdesc, $configdefault, PARAM_TEXT));
 
-$configkey = new lang_string('cfg_cnoauthresource_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_cnoauthresource_desc', 'auth_cnoauth');
-$configdefault = 'https://graph.microsoft.com';
-$settings->add(new admin_setting_configtext('auth_cnoauth/cnoauthresource', $configkey, $configdesc, $configdefault, PARAM_TEXT));
+$configkey = new lang_string('cfg_userinfoendpoint_key', 'auth_cnoauth');
+$configdesc = new lang_string('cfg_userinfoendpoint_desc', 'auth_cnoauth');
+$configdefault = 'https://api.weixin.qq.com/sns/userinfo';
+$settings->add(new admin_setting_configtext('auth_cnoauth/userinfoendpoint', $configkey, $configdesc, $configdefault, PARAM_TEXT));
 
 $configkey = new lang_string('cfg_cnoauthscope_key', 'auth_cnoauth');
 $configdesc = new lang_string('cfg_cnoauthscope_desc', 'auth_cnoauth');
-$configdefault = 'openid profile email';
+$configdefault = 'snsapi_userinfo';
 $settings->add(new admin_setting_configtext('auth_cnoauth/cnoauthscope', $configkey, $configdesc, $configdefault, PARAM_TEXT));
 
 $configkey = new lang_string('cfg_redirecturi_key', 'auth_cnoauth');
@@ -75,50 +75,17 @@ $configdesc = new lang_string('cfg_forceredirect_desc', 'auth_cnoauth');
 $configdefault = 0;
 $settings->add(new admin_setting_configcheckbox('auth_cnoauth/forceredirect', $configkey, $configdesc, $configdefault));
 
-$configkey = new lang_string('cfg_autoappend_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_autoappend_desc', 'auth_cnoauth');
-$configdefault = '';
-$settings->add(new admin_setting_configtext('auth_cnoauth/autoappend', $configkey, $configdesc, $configdefault, PARAM_TEXT));
-
-$configkey = new lang_string('cfg_domainhint_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_domainhint_desc', 'auth_cnoauth');
-$configdefault = '';
-$settings->add(new admin_setting_configtext('auth_cnoauth/domainhint', $configkey, $configdesc, $configdefault, PARAM_TEXT));
-
-$configkey = new lang_string('cfg_loginflow_key', 'auth_cnoauth');
-$configdesc = '';
-$configdefault = 'authcode';
-$settings->add(new auth_cnoauth_admin_setting_loginflow('auth_cnoauth/loginflow', $configkey, $configdesc, $configdefault));
-
-$configkey = new lang_string('cfg_userrestrictions_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_userrestrictions_desc', 'auth_cnoauth');
-$configdefault = '';
-$settings->add(new admin_setting_configtextarea('auth_cnoauth/userrestrictions', $configkey, $configdesc, $configdefault, PARAM_TEXT));
-
-$configkey = new lang_string('cfg_userrestrictionscasesensitive_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_userrestrictioncasesensitive_desc', 'auth_cnoauth');
-$settings->add(new admin_setting_configcheckbox('auth_cnoauth/userrestrictionscasesensitive', $configkey, $configdesc, '1'));
-
-$configkey = new lang_string('cfg_signoffintegration_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_signoffintegration_desc', 'auth_cnoauth', $CFG->wwwroot);
-$settings->add(new admin_setting_configcheckbox('auth_cnoauth/single_sign_off', $configkey, $configdesc, '0'));
-
-$configkey = new lang_string('cfg_logoutendpoint_key', 'auth_cnoauth');
-$configdesc = new lang_string('cfg_logoutendpoint_desc', 'auth_cnoauth');
-$configdefault = 'https://login.microsoftonline.com/common/oauth2/logout';
-$settings->add(new admin_setting_configtext('auth_cnoauth/logouturi', $configkey, $configdesc, $configdefault, PARAM_TEXT));
-
 $label = new lang_string('cfg_debugmode_key', 'auth_cnoauth');
 $desc = new lang_string('cfg_debugmode_desc', 'auth_cnoauth');
 $settings->add(new \admin_setting_configcheckbox('auth_cnoauth/debugmode', $label, $desc, '0'));
 
 $configkey = new lang_string('cfg_icon_key', 'auth_cnoauth');
 $configdesc = new lang_string('cfg_icon_desc', 'auth_cnoauth');
-$configdefault = 'auth_cnoauth:o365';
+$configdefault = 'auth_cnoauth:wechat';
 $icons = [
     [
-        'pix' => 'o365',
-        'alt' => new lang_string('cfg_iconalt_o365', 'auth_cnoauth'),
+        'pix' => 'wechat',
+        'alt' => new lang_string('cfg_iconalt_wechat', 'auth_cnoauth'),
         'component' => 'auth_cnoauth',
     ],
     [

@@ -18,7 +18,7 @@
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -27,7 +27,8 @@ require_once($CFG->libdir.'/authlib.php');
 require_once($CFG->dirroot.'/login/lib.php');
 
 /**
- * OpenID Connect Authentication Plugin.
+ * CN OpenID Connect Authentication Plugin.
+ * CN OpenID 身份认证插件
  */
 class auth_plugin_cnoauth extends \auth_plugin_base {
     /** @var string Authentication plugin type - the same as db field. */
@@ -51,11 +52,6 @@ class auth_plugin_cnoauth extends \auth_plugin_base {
         } else {
             if (!empty($forceloginflow) && is_string($forceloginflow)) {
                 $loginflow = $forceloginflow;
-            } else {
-                $configuredloginflow = get_config('auth_cnoauth', 'loginflow');
-                if (!empty($configuredloginflow)) {
-                    $loginflow = $configuredloginflow;
-                }
             }
         }
         $loginflowclass = '\auth_cnoauth\loginflow\\'.$loginflow;

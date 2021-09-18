@@ -16,7 +16,7 @@
 
 /**
  * @package auth_cnoauth
- * @author Lai Wei <lai.wei@enovation.ie>
+ * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @copyright (C) 2021 onwards Microsoft, Inc. (http://microsoft.com/)
  */

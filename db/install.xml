@@ -39,16 +39,13 @@
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="cnoauthuniqid" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="cnoauth uniqid"/>
-        <FIELD NAME="username" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false" COMMENT="username"/>
         <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="moodle userid"/>
-        <FIELD NAME="cnoauthusername" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="cnoauth username"/>
         <FIELD NAME="scope" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="token scope"/>
-        <FIELD NAME="tokenresource" TYPE="char" LENGTH="127" NOTNULL="true" SEQUENCE="false" COMMENT="token resource"/>
         <FIELD NAME="authcode" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="auth code"/>
         <FIELD NAME="token" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="token"/>
         <FIELD NAME="expiry" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="token expiry"/>
         <FIELD NAME="refreshtoken" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="refresh token"/>
-        <FIELD NAME="idtoken" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="id token"/>
+        <FIELD NAME="userinfo" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="user information"/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -56,7 +53,6 @@
       <INDEXES>
         <INDEX NAME="cnoauthuniqid" UNIQUE="false" FIELDS="cnoauthuniqid"/>
         <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
-        <INDEX NAME="username" UNIQUE="false" FIELDS="username"/>
       </INDEXES>
     </TABLE>
   </TABLES>

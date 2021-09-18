@@ -17,9 +17,8 @@
 /**
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
- * @author Lai Wei <lai.wei@enovation.ie>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth\loginflow;
@@ -169,7 +168,7 @@ class authcode extends base {
         $client->authrequest($promptlogin, $stateparams, $extraparams);
     }
 
-    /**
+    /** ok
      * Handle an authorization request response received from the configured OP.
      * 处理授权请求
      *
@@ -183,17 +182,20 @@ class authcode extends base {
             throw new \moodle_exception('errorauthgeneral', 'auth_cnoauth');
         }
 
+        // auth参数没有code
         if (!isset($authparams['code'])) {
             utils::debug('No auth code received.', 'authcode::handleauthresponse', $authparams);
             throw new \moodle_exception('errorauthnoauthcode', 'auth_cnoauth');
         }
 
+        // auth参数没有state
         if (!isset($authparams['state'])) {
             utils::debug('No state received.', 'authcode::handleauthresponse', $authparams);
             throw new \moodle_exception('errorauthunknownstate', 'auth_cnoauth');
         }
 
         // Validate and expire state.
+        // 检查auth_cnoauth_state表中是否存在对应state的记录值
         $staterec = $DB->get_record('auth_cnoauth_state', ['state' => $authparams['state']]);
         if (empty($staterec)) {
             throw new \moodle_exception('errorauthunknownstate', 'auth_cnoauth');
@@ -212,22 +214,12 @@ class authcode extends base {
         // Get token from auth code.
         $client = $this->get_cnoauthclient();
         $tokenparams = $client->tokenrequest($authparams['code']);
-        if (!isset($tokenparams['id_token'])) {
-            throw new \moodle_exception('errorauthnoidtoken', 'auth_cnoauth');
+        if (!isset($tokenparams['user_info'])) {
+            throw new \moodle_exception('errorauthnouserinfo', 'auth_cnoauth');
         }
 
-        // // Decode and verify idtoken.
-        list($cnoauthuniqid, $idtoken) = $this->process_idtoken($tokenparams['id_token'], $orignonce);
-        // $idtoken = $tokenparams['access_token'];
-        // $cnoauthuniqid = $tokenparams['unionid'];
-
-        // // Check restrictions.
-        // $passed = $this->checkrestrictions($idtoken);
-        // if ($passed !== true && empty($additionaldata['ignorerestrictions'])) {
-        //     $errstr = 'User prevented from logging in due to restrictions.';
-        //     utils::debug($errstr, 'handleauthresponse', $idtoken);
-        //     throw new \moodle_exception('errorrestricted', 'auth_cnoauth');
-        // }
+        // Decode and verify userinfo.
+        list($cnoauthuniqid, $userinfo) = $this->process_userinfo($tokenparams['user_info'], $orignonce);
 
         // This is for setting the system API user.
         if (isset($additionaldata['justauth']) && $additionaldata['justauth'] === true) {
@@ -243,295 +235,46 @@ class authcode extends base {
             return true;
         }
 
-        // Check if cnoauth user is already migrated.
-        $tokenrec = $DB->get_record('auth_cnoauth_token', ['cnoauthuniqid' => $cnoauthuniqid]);
-        if (isloggedin() && !isguestuser() && (empty($tokenrec) || (isset($USER->auth) && $USER->auth !== 'cnoauth'))) {
-
-            // If user is already logged in and trying to link Microsoft 365 account or use it for cnoauth.
-            // Check if that Microsoft 365 account already exists in moodle.
-            $userrec = $DB->count_records_sql('SELECT COUNT(*)
-                                                 FROM {user}
-                                                WHERE username = ?
-                                                      AND id != ?',
-                    [$idtoken->claim('upn'), $USER->id]);
-
-            if (!empty($userrec)) {
-                if (empty($additionaldata['redirect'])) {
-                    $redirect = '/auth/cnoauth/ucp.php?o365accountconnected=true';
-                } else if ($additionaldata['redirect'] == '/local/o365/ucp.php') {
-                    $redirect = $additionaldata['redirect'].'?action=connection&o365accountconnected=true';
-                } else {
-                    throw new \moodle_exception('errorinvalidredirect_message', 'auth_cnoauth');
-                }
-                redirect(new \moodle_url($redirect));
-            }
-
-            // If the user is already logged in we can treat this as a "migration" - a user switching to cnoauth.
-            $connectiononly = false;
-            if (isset($additionaldata['connectiononly']) && $additionaldata['connectiononly'] === true) {
-                $connectiononly = true;
-            }
-            $this->handlemigration($cnoauthuniqid, $authparams, $tokenparams, $idtoken, $connectiononly);
-            $redirect = (!empty($additionaldata['redirect'])) ? $additionaldata['redirect'] : '/auth/cnoauth/ucp.php';
-            redirect(new \moodle_url($redirect));
-        } else {
-            // Otherwise it's a user logging in normally with cnoauth.
-            $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $idtoken);
-            redirect(core_login_get_return_url());
-        }
+        // user logging in normally with cnoauth.
+        $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $userinfo);//处理登录
     }
 
-    /**
-     * Handle a user migration event.
-     *
-     * @param string $cnoauthuniqid A unique identifier for the user.
-     * @param array $authparams Paramteres receieved from the auth request.
-     * @param array $tokenparams Parameters received from the token request.
-     * @param \auth_cnoauth\jwt $idtoken A JWT object representing the received id_token.
-     * @param bool $connectiononly Whether to just connect the user (true), or to connect and change login method (false).
-     */
-    protected function handlemigration($cnoauthuniqid, $authparams, $tokenparams, $idtoken, $connectiononly = false) {
-        global $USER, $DB, $CFG;
-
-        // Check if cnoauth user is already connected to a Moodle user.
-        $tokenrec = $DB->get_record('auth_cnoauth_token', ['cnoauthuniqid' => $cnoauthuniqid]);
-        if (!empty($tokenrec)) {
-            $existinguserparams = ['username' => $tokenrec->username, 'mnethostid' => $CFG->mnet_localhost_id];
-            $existinguser = $DB->get_record('user', $existinguserparams);
-            if (empty($existinguser)) {
-                $DB->delete_records('auth_cnoauth_token', ['id' => $tokenrec->id]);
-            } else {
-                if ($USER->username === $tokenrec->username) {
-                    // Already connected to current user.
-                    if ($connectiononly !== true && $USER->auth !== 'cnoauth') {
-                        // Update auth plugin.
-                        $DB->update_record('user', (object)['id' => $USER->id, 'auth' => 'cnoauth']);
-                        $USER = $DB->get_record('user', ['id' => $USER->id]);
-                        $USER->auth = 'cnoauth';
-                    }
-                    $this->updatetoken($tokenrec->id, $authparams, $tokenparams);
-                    return true;
-                } else {
-                    // cnoauth user connected to user that is not us. Can't continue.
-                    throw new \moodle_exception('errorauthuserconnectedtodifferent', 'auth_cnoauth');
-                }
-            }
-        }
-
-        // Check if Moodle user is already connected to an cnoauth user.
-        $tokenrec = $DB->get_record('auth_cnoauth_token', ['userid' => $USER->id]);
-        if (!empty($tokenrec)) {
-            if ($tokenrec->cnoauthuniqid === $cnoauthuniqid) {
-                // Already connected to current user.
-                if ($connectiononly !== true && $USER->auth !== 'cnoauth') {
-                    // Update auth plugin.
-                    $DB->update_record('user', (object)['id' => $USER->id, 'auth' => 'cnoauth']);
-                    $USER = $DB->get_record('user', ['id' => $USER->id]);
-                    $USER->auth = 'cnoauth';
-                }
-                $this->updatetoken($tokenrec->id, $authparams, $tokenparams);
-                return true;
-            } else {
-                throw new \moodle_exception('errorauthuseralreadyconnected', 'auth_cnoauth');
-            }
-        }
-
-        // Create token data.
-        $tokenrec = $this->createtoken($cnoauthuniqid, $USER->username, $authparams, $tokenparams, $idtoken, $USER->id);
-
-        $eventdata = [
-            'objectid' => $USER->id,
-            'userid' => $USER->id,
-            'other' => [
-                'username' => $USER->username,
-                'userid' => $USER->id,
-                'cnoauthuniqid' => $cnoauthuniqid,
-            ],
-        ];
-        $event = \auth_cnoauth\event\user_connected::create($eventdata);
-        $event->trigger();
-
-        // Switch auth method, if requested.
-        if ($connectiononly !== true) {
-            if ($USER->auth !== 'cnoauth') {
-                $DB->delete_records('auth_cnoauth_prevlogin', ['userid' => $USER->id]);
-                $userrec = $DB->get_record('user', ['id' => $USER->id]);
-                if (!empty($userrec)) {
-                    $prevloginrec = [
-                        'userid' => $userrec->id,
-                        'method' => $userrec->auth,
-                        'password' => $userrec->password,
-                    ];
-                    $DB->insert_record('auth_cnoauth_prevlogin', $prevloginrec);
-                }
-            }
-            $DB->update_record('user', (object)['id' => $USER->id, 'auth' => 'cnoauth']);
-            $USER = $DB->get_record('user', ['id' => $USER->id]);
-            $USER->auth = 'cnoauth';
-        }
-
-        return true;
-    }
-
-    /**
-     * Determines whether the given Azure AD UPN is already matched to a Moodle user (and has not been completed).
-     *
-     * @return false|stdClass Either the matched Moodle user record, or false if not matched.
-     */
-    protected function check_for_matched($aadupn) {
-        global $DB;
-
-        if (auth_cnoauth_is_local_365_installed()) {
-            $match = $DB->get_record('local_o365_connections', ['aadupn' => $aadupn]);
-            if (!empty($match) && \local_o365\utils::is_o365_connected($match->muserid) !== true) {
-                return $DB->get_record('user', ['id' => $match->muserid]);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Check for an existing user object.
-     * @param string $cnoauthuniqid The user object ID to look up.
-     * @param string $username The original username.
-     * @return string If there is an existing user object, return the username associated with it.
-     *                If there is no existing user object, return the original username.
-     */
-    protected function check_objects($cnoauthuniqid, $username) {
-        global $DB;
-
-        $user = null;
-        if (auth_cnoauth_is_local_365_installed()) {
-            $sql = 'SELECT u.username
-                      FROM {local_o365_objects} obj
-                      JOIN {user} u ON u.id = obj.moodleid
-                     WHERE obj.objectid = ? and obj.type = ?';
-            $params = [$cnoauthuniqid, 'user'];
-            $user = $DB->get_record_sql($sql, $params);
-        }
-
-        return (!empty($user)) ? $user->username : $username;
-    }
-
-    /**
-     * Handle a login event.
+    /** ok
+     * Handle a login event. 处理登录事件 
      *
      * @param string $cnoauthuniqid A unique identifier for the user.
      * @param array $authparams Parameters receieved from the auth request.
      * @param array $tokenparams Parameters received from the token request.
-     * @param \auth_cnoauth\jwt $idtoken A JWT object representing the received id_token.
      */
-    protected function handlelogin($cnoauthuniqid, $authparams, $tokenparams, $idtoken) {
-        global $DB, $CFG;
+    protected function handlelogin($cnoauthuniqid, $authparams, $tokenparams, $userinfo) {
+        global $DB;
 
         $tokenrec = $DB->get_record('auth_cnoauth_token', ['cnoauthuniqid' => $cnoauthuniqid]);
         if (!empty($tokenrec)) {
-            // Already connected user.
-            if (empty($tokenrec->userid)) {
-                // Existing token record, but missing the user ID.
-                $user = $DB->get_record('user', ['username' => $tokenrec->username]);
-                if (empty($user)) {
-                    // Token exists, but it doesn't have a valid username.
-                    // In this case, delete the token, and try to process login again.
-                    $DB->delete_records('auth_cnoauth_token', ['id' => $tokenrec->id]);
-                    return $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $idtoken);
-                }
-                $tokenrec->userid = $user->id;
-                $DB->update_record('auth_cnoauth_token', $tokenrec);
-            } else {
-                // Existing token with a user ID.
+            // 已存在token记录
+            $params = array('cnoauthuniqid'=>$cnoauthuniqid, 'redirecturl'=>'/auth/cnoauth');
+            $redirecturl = new \moodle_url('/auth/cnoauth/bindaccount.php', $params);
+            if ($tokenrec->userid != 0){
+                // tokenrec存在userid值
                 $user = $DB->get_record('user', ['id' => $tokenrec->userid]);
-                if (empty($user)) {
-                    $failurereason = AUTH_LOGIN_NOUSER;
-                    $eventdata = ['other' => ['username' => $tokenrec->username, 'reason' => $failurereason]];
-                    $event = \core\event\user_login_failed::create($eventdata);
-                    $event->trigger();
+                if(empty($user)){
                     // Token is invalid, delete it.
                     $DB->delete_records('auth_cnoauth_token', ['id' => $tokenrec->id]);
-                    return $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $idtoken);
+                    return $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $userinfo);
                 }
+
+                complete_user_login($user);  // 用户登录
+                redirect(core_login_get_return_url());  // 进入系统
+            }else {
+                // token表没有记录userid值
+                redirect($redirecturl); // 跳转到绑定用户页面
             }
-            $username = $user->username;
-            $this->updatetoken($tokenrec->id, $authparams, $tokenparams);
-            $user = authenticate_user_login($username, null, true);
-            complete_user_login($user);
-            return true;
+
         } else {
-            // No existing token, user not connected.
-            //
-            // Possibilities:
-            //     - Matched user.
-            //     - New user (maybe create).
+            // No existing token, user not connected.没有token的记录
+            $tokenrec = $this->createtoken($cnoauthuniqid, $authparams, $tokenparams, 0); 
+            return $this->handlelogin($cnoauthuniqid, $authparams, $tokenparams, $userinfo);
 
-            // Generate a Moodle username.
-            // Use 'upn' if available for username (Azure-specific), or fall back to lower-case cnoauthuniqid.
-            $username = $idtoken->claim('upn');
-            $originalupn = null;
-            if (empty($username)) {
-                $username = $cnoauthuniqid;
-
-                // If upn claim is missing, it can mean either the IdP is not Azure AD, or it's a guest user.
-                if (\auth_cnoauth_is_local_365_installed()) {
-                    $apiclient = \local_o365\utils::get_api();
-                    $userdetails = $apiclient->get_user($cnoauthuniqid, true);
-                    if (!is_null($userdetails) && isset($userdetails['userPrincipalName']) &&
-                        stripos($userdetails['userPrincipalName'], '#EXT#') !== false && $idtoken->claim('unique_name')) {
-                        $originalupn = $userdetails['userPrincipalName'];
-                        $username = $idtoken->claim('unique_name');
-                    }
-                }
-            }
-
-            // See if we have an object listing.
-            $username = $this->check_objects($cnoauthuniqid, $username);
-            $matchedwith = $this->check_for_matched($username);
-            if (!empty($matchedwith)) {
-                if ($matchedwith->auth != 'cnoauth') {
-                    $matchedwith->aadupn = $username;
-                    throw new \moodle_exception('errorusermatched', 'auth_cnoauth', null, $matchedwith);
-                }
-            }
-            $username = trim(\core_text::strtolower($username));
-            $tokenrec = $this->createtoken($cnoauthuniqid, $username, $authparams, $tokenparams, $idtoken, 0, $originalupn);
-
-            $existinguserparams = ['username' => $username, 'mnethostid' => $CFG->mnet_localhost_id];
-            if ($DB->record_exists('user', $existinguserparams) !== true) {
-                // User does not exist. Create user if site allows, otherwise fail.
-                if (empty($CFG->authpreventaccountcreation)) {
-                    $user = create_user_record($username, null, 'cnoauth');
-                } else {
-                    // Trigger login failed event.
-                    $failurereason = AUTH_LOGIN_NOUSER;
-                    $eventdata = ['other' => ['username' => $username, 'reason' => $failurereason]];
-                    $event = \core\event\user_login_failed::create($eventdata);
-                    $event->trigger();
-                    throw new \moodle_exception('errorauthloginfailednouser', 'auth_cnoauth', null, null, '1');
-                }
-            }
-
-            $user = authenticate_user_login($username, null, true);
-
-            if (!empty($user)) {
-                $tokenrec = $DB->get_record('auth_cnoauth_token', ['id' => $tokenrec->id]);
-                // This should be already done in auth_plugin_cnoauth::user_authenticated_hook, but just in case...
-                if (!empty($tokenrec) && empty($tokenrec->userid)) {
-                    $updatedtokenrec = new \stdClass;
-                    $updatedtokenrec->id = $tokenrec->id;
-                    $updatedtokenrec->userid = $user->id;
-                    $DB->update_record('auth_cnoauth_token', $updatedtokenrec);
-                }
-                complete_user_login($user);
-                return true;
-            } else {
-                // There was a problem in authenticate_user_login. Clean up incomplete token record.
-                if (!empty($tokenrec)) {
-                    $DB->delete_records('auth_cnoauth_token', ['id' => $tokenrec->id]);
-                }
-                throw new \moodle_exception('errorauthgeneral', 'auth_cnoauth', null, null, '2');
-            }
-
-            return true;
         }
     }
 }

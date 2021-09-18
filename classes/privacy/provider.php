@@ -16,9 +16,9 @@
 
 /**
  * @package auth_cnoauth
- * @author Martin Liao <liaohanzhen@163.com>
+ * @author Martin Liao <liaohanzhen@163.com> 关于隐私数据处理
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth\privacy;
@@ -64,7 +64,7 @@ class provider implements
                 'token',
                 'expiry',
                 'refreshtoken',
-                'idtoken',
+                'userinfo',
             ],
         ];
 

@@ -18,7 +18,7 @@
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 namespace auth_cnoauth;
@@ -28,7 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/auth/cnoauth/lib.php');
 
 /**
- * OpenID Connect Client
+ * CN OpenID Connect Client
  */
 class cnoauthclient {
     /** @var httpclientinterface An HTTP client to use. */
@@ -73,15 +73,15 @@ class cnoauthclient {
         if (!empty($tokenresource)) {
             $this->tokenresource = $tokenresource;
         } else {
-            if (auth_cnoauth_is_local_365_installed()) {
-                if (\local_o365\rest\o365api::use_chinese_api() === true) {
-                    $this->tokenresource = 'https://microsoftgraph.chinacloudapi.cn';
-                } else {
-                    $this->tokenresource = 'https://graph.microsoft.com';
-                }
-            } else {
+            // if (auth_cnoauth_is_local_365_installed()) {
+            //     if (\local_o365\rest\o365api::use_chinese_api() === true) {
+            //         $this->tokenresource = 'https://microsoftgraph.chinacloudapi.cn';
+            //     } else {
+            //         $this->tokenresource = 'https://graph.microsoft.com';
+            //     }
+            // } else {
                 $this->tokenresource = 'https://graph.microsoft.com';
-            }
+            // }
 
         }
         $this->scope = (!empty($scope)) ? $scope : 'openid profile email';
@@ -255,7 +255,7 @@ class cnoauthclient {
 
         try {
             $returned = $this->httpclient->post($this->endpoints['token'], $params);
-            return utils::process_json_response($returned, ['token_type' => null, 'id_token' => null]);
+            return utils::process_json_response($returned, ['token_type' => null, 'user_info' => null]);
         } catch (\Exception $e) {
             utils::debug('Error in rocredsrequest request', 'cnoauthclient::rocredsrequest', $e->getMessage());
             return false;
@@ -285,17 +285,17 @@ class cnoauthclient {
 
         $returned = $this->httpclient->post($this->endpoints['token'], $params);
         
-        // 获得用户信息并添加作为id_token对应微软
-        $url = "https://api.weixin.qq.com/sns/userinfo";
+        // 获得用户信息并添加作为userinfo对应微软
         $returned_array = json_decode($returned,true);
-        $params_userinfo = [
+        $params_user_info = [
             'access_token' => $returned_array['access_token'],
             'openid' => $returned_array['openid'],
         ];
-        $userinfo = $this->httpclient->post($url, $params_userinfo);
-        $returned_array['id_token'] = json_decode($userinfo,true);
+
+        $user_info = $this->httpclient->post($this->endpoints['userinfo'], $params_user_info);
+        $returned_array['user_info'] = json_decode($user_info,true);
         $returned = json_encode($returned_array);
         
-        return utils::process_json_response($returned, ['id_token' => null]);
+        return utils::process_json_response($returned, ['user_info' => null]);  // 检查是否有user_info信息
     }
 }

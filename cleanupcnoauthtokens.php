@@ -18,9 +18,9 @@
  * Admin page to cleanup cnoauth tokens.
  *
  * @package auth_cnoauth
- * @author Lai Wei <lai.wei@enovation.ie>
+ * @author Martin Liao <liaohanzhen@163.com>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 require_once(__DIR__ . '/../../config.php');
@@ -45,10 +45,10 @@ $PAGE->navbar->add(get_string('authentication', 'admin'), new moodle_url('/admin
 $PAGE->navbar->add(get_string('pluginname', 'auth_cnoauth'), new moodle_url('/admin/settings.php', ['section' => 'authsettingcnoauth']));
 $PAGE->navbar->add(get_string('cleanup_cnoauth_tokens', 'auth_cnoauth'));
 
-$emptyuseridtokens = auth_cnoauth_get_tokens_with_empty_ids();
+$emptyuseruserinfos = auth_cnoauth_get_tokens_with_empty_ids();
 $mismatchedtokens = auth_cnoauth_get_tokens_with_mismatched_usernames();
 
-$tokenstoclean = $emptyuseridtokens + $mismatchedtokens;
+$tokenstoclean = $emptyuseruserinfos + $mismatchedtokens;
 
 uasort($tokenstoclean, function($a, $b) {
     return strcmp($a->cnoauthusername, $b->cnoauthusername);

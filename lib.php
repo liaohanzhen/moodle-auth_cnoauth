@@ -17,9 +17,8 @@
 /**
  * @package auth_cnoauth
  * @author Martin Liao <liaohanzhen@163.com>
- * @author Lai Wei <lai.wei@enovation.ie>
  * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @copyright (C) 2014 onwards Microsoft, Inc. (http://microsoft.com/)
+ * @copyright (C) 2021
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -94,31 +93,16 @@ function auth_cnoauth_connectioncapability($userid, $mode = 'connect', $require 
     return $result;
 }
 
-/**
- * Determine if local_o365 plugins is installed.
- *
- * @return bool
- */
-function auth_cnoauth_is_local_365_installed() {
-    global $CFG, $DB;
-
-    $dbmanager = $DB->get_manager();
-
-    return file_exists($CFG->dirroot . '/local/o365/version.php') &&
-        $DB->record_exists('config_plugins', ['plugin' => 'local_o365', 'name' => 'version']) &&
-        $dbmanager->table_exists('local_o365_objects') &&
-        $dbmanager->table_exists('local_o365_connections');
-}
 
 /**
  * Return details of all auth_cnoauth tokens having empty Moodle user IDs.
- *
+ * 获得没有对应用户ID的token，根据username匹配
  * @return array
  */
 function auth_cnoauth_get_tokens_with_empty_ids() {
     global $DB;
 
-    $emptyuseridtokens = [];
+    $emptyuseruserinfos = [];
 
     $records = $DB->get_records('auth_cnoauth_token', ['userid' => '0']);
 
@@ -134,15 +118,15 @@ function auth_cnoauth_get_tokens_with_empty_ids() {
         $deletetokenurl = new moodle_url('/auth/cnoauth/cleanupcnoauthtokens.php', ['id' => $record->id]);
         $item->action = html_writer::link($deletetokenurl, get_string('delete_token', 'auth_cnoauth'));
 
-        $emptyuseridtokens[$record->id] = $item;
+        $emptyuseruserinfos[$record->id] = $item;
     }
 
-    return $emptyuseridtokens;
+    return $emptyuseruserinfos;
 }
 
 /**
  * Return details of all auth_cnoauth tokens with matching Moodle user IDs, but mismatched usernames.
- *
+ * 获得不匹配的用户
  * @return array
  */
 function auth_cnoauth_get_tokens_with_mismatched_usernames() {
@@ -166,7 +150,7 @@ function auth_cnoauth_get_tokens_with_mismatched_usernames() {
         $item->matchingstatus = get_string('mismatched', 'auth_cnoauth');
         $item->details = get_string('mismatched_details', 'auth_cnoauth',
             ['tokenusername' => $record->tokenusername, 'moodleusername' => $record->musername]);
-        $deletetokenurl = new moodle_url('/auth/cnoauth/cleanupiodctokens.php', ['id' => $record->id]);
+        $deletetokenurl = new moodle_url('/auth/cnoauth/cleanupcnoauthtokens.php', ['id' => $record->id]);
         $item->action = html_writer::link($deletetokenurl, get_string('delete_token_and_reference', 'auth_cnoauth'));
 
         $mismatchedtokens[$record->id] = $item;
@@ -177,30 +161,11 @@ function auth_cnoauth_get_tokens_with_mismatched_usernames() {
 
 /**
  * Delete the auth_cnoauth token with the ID.
- *
+ * 删除token
  * @param int $tokenid
  */
 function auth_cnoauth_delete_token(int $tokenid) {
     global $DB;
-
-    if (auth_cnoauth_is_local_365_installed()) {
-        $sql = 'SELECT obj.id, obj.objectid, tok.token, u.id AS userid, u.email
-                  FROM {local_o365_objects} obj
-                  JOIN {auth_cnoauth_token} tok ON obj.o365name = tok.username
-                  JOIN {user} u ON obj.moodleid = u.id
-                 WHERE type = :type AND tok.id = :tokenid';
-        if ($objectrecord = $DB->get_record_sql($sql, ['type' => 'user', 'tokenid' => $tokenid], IGNORE_MULTIPLE)) {
-            // Delete record from local_o365_objects.
-            $DB->get_records('local_o365_objects', ['id' => $objectrecord->id]);
-
-            // Delete record from local_o365_token.
-            $DB->delete_records('local_o365_token', ['user_id' => $objectrecord->userid]);
-
-            // Delete record from local_o365_connections.
-            $DB->delete_records_select('local_o365_connections', 'muserid = :userid OR LOWER(aadupn) = :email',
-                ['userid' => $objectrecord->userid, 'email' => $objectrecord->email]);
-        }
-    }
 
     $DB->delete_records('auth_cnoauth_token', ['id' => $tokenid]);
 }
